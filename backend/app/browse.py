@@ -23,6 +23,12 @@ def suggestions() -> list[Suggestion]:
         if d.is_dir():
             out.append(Suggestion(label=f"~/{name}", path=str(d)))
     out.append(Suggestion(label="Home", path=str(home)))
+    # small, well-known public repositories that clone in a few seconds
+    out += [
+        Suggestion(label="psf/requests", path="https://github.com/psf/requests", kind="remote"),
+        Suggestion(label="pallets/flask", path="https://github.com/pallets/flask", kind="remote"),
+        Suggestion(label="expressjs/express", path="https://github.com/expressjs/express", kind="remote"),
+    ]
     return out
 
 

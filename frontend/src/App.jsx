@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useReactFlow } from "@xyflow/react";
-import { analyzeRepo, getHealth, getSuggestions } from "./api";
+import { analyzeRepo, getHealth, getSuggestions, isRepoUrl } from "./api";
 import RepoInput from "./components/RepoInput";
 import GraphCanvas from "./components/GraphCanvas";
 import SidePanel from "./components/SidePanel";
@@ -20,7 +20,7 @@ export default function App() {
   const [selectedId, setSelectedId] = useState(null);
   const [search, setSearch] = useState("");
   const [hideIsolated, setHideIsolated] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState("");        // "" or the message to show while working
   const [error, setError] = useState("");
   const [backendUp, setBackendUp] = useState(true);
   const [suggestions, setSuggestions] = useState([]);
@@ -50,17 +50,18 @@ export default function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, [showPicker, showHelp]);
 
-  async function handleAnalyze(p) {
+  // refresh=true (URLs only) throws away the cached clone and downloads the latest commit.
+  async function handleAnalyze(p, refresh = false) {
     const target = p.trim();
     if (!target) return;
     setPath(target);
     setShowPicker(false);
-    setLoading(true);
+    setLoading(isRepoUrl(target) ? "Fetching the repository… the first download of a repository can take a minute." : "Scanning files and resolving imports…");
     setError("");
     setSelectedId(null);
     setSearch("");
     try {
-      const g = await analyzeRepo(target);
+      const g = await analyzeRepo(target, refresh);
       setGraph(g);
       setBackendUp(true);
       localStorage.setItem(LS_LAST, target);
@@ -112,7 +113,7 @@ export default function App() {
     <div className="app">
       <header className="topbar">
         <h1 title="Repo Visualizer">Repo Visualizer</h1>
-        <RepoInput value={path} onChange={setPath} onSubmit={handleAnalyze} onBrowse={() => setShowPicker(true)} loading={loading} />
+        <RepoInput value={path} onChange={setPath} onSubmit={handleAnalyze} onBrowse={() => setShowPicker(true)} loading={!!loading} />
         {graph && (
           <div className="search-wrap">
             <input
@@ -133,6 +134,14 @@ export default function App() {
             <span title="Lines of code, excluding blank lines and comments"><b>{stats.total_loc.toLocaleString()}</b> loc</span>
             <span className={stats.cycles ? "warn" : ""} title="Groups of files that import each other in a loop"><b>{stats.cycles}</b> cycles</span>
             {matches && <span><b>{matches.size}</b> {matches.size === 1 ? "match" : "matches"}</span>}
+          </div>
+        )}
+        {graph?.source_url && (
+          <div className="source-badge" title={graph.source_url}>
+            <span className="source-name">{graph.source_url.replace(/^https?:\/\//, "")}</span>
+            <span className="source-commit" title="Commit that was analysed">@{graph.commit}</span>
+            <button className="icon-btn" onClick={() => handleAnalyze(graph.source_url, true)} disabled={!!loading}
+                    title="Download the latest commit and analyse again">↻</button>
           </div>
         )}
         <button className="icon-btn help-btn" onClick={() => setShowHelp(true)} title="How to read the map (?)">?</button>
@@ -171,7 +180,7 @@ export default function App() {
               recents={recents}
               onPick={handleAnalyze}
               onBrowse={() => setShowPicker(true)}
-              loading={loading}
+              loading={!!loading}
             />
           )}
           {matches && matches.size === 0 && (
@@ -180,7 +189,7 @@ export default function App() {
           {loading && (
             <div className="loading">
               <div className="spinner" />
-              <div>Scanning files and resolving imports…</div>
+              <div>{loading}</div>
             </div>
           )}
         </main>

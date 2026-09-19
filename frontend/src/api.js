@@ -29,6 +29,7 @@ const json = (body) => ({
 export const getHealth = () => request("/health");
 export const getSuggestions = () => request("/suggestions");
 export const browseDir = (path) => request(`/browse${path ? `?path=${encodeURIComponent(path)}` : ""}`);
-export const analyzeRepo = (path) => request("/analyze", json({ path }));
+export const analyzeRepo = (path, refresh = false) => request("/analyze", json({ path, refresh }));
+export const isRepoUrl = (text) => /^https?:\/\//i.test(text.trim());
 export const getFile = (path) => request(`/file?path=${encodeURIComponent(path)}`);
 export const summarizeFile = (path) => request("/summarize", json({ path }));

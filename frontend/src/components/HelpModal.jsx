@@ -15,6 +15,7 @@ export default function HelpModal({ onClose }) {
 
         <h3>Getting around</h3>
         <ul>
+          <li><b>Paste a GitHub URL</b> in the path box to analyse a public repository. It is downloaded once and reused; the ↻ button next to its name fetches the latest commit.</li>
           <li><b>Click a file</b> to open its details. Everything unrelated fades so you can see what it depends on.</li>
           <li><b>Click a folder</b> in the left list or on the canvas to zoom to it.</li>
           <li><b>Drag</b> the background to pan, <b>scroll</b> to zoom, <b>drag a card</b> to move it. The fit button (⛶) in the bottom-left resets the view.</li>

@@ -10,6 +10,8 @@ need python3 "Install Python 3.11+ from https://www.python.org/downloads/"
 need node    "Install Node 18+ from https://nodejs.org/"
 need npm     "npm ships with Node."
 
+command -v git >/dev/null 2>&1 || echo "ℹ git is not installed – analysing GitHub URLs will not work until it is (https://git-scm.com/)"
+
 echo "▸ Python $(python3 --version | cut -d' ' -f2), Node $(node --version)"
 
 if [ ! -d backend/.venv ]; then

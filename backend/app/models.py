@@ -11,7 +11,9 @@ from pydantic import BaseModel, Field
 
 # ------------------------------------------------------------ requests
 class AnalyzeRequest(BaseModel):
-    path: str = Field(..., description="Absolute path to a local repository", examples=["/home/you/project"])
+    path: str = Field(..., description="Absolute local path, or a public repository URL",
+                      examples=["/home/you/project", "https://github.com/psf/requests"])
+    refresh: bool = Field(False, description="URLs only: discard the cached clone and download the latest commit")
 
 
 class SummarizeRequest(BaseModel):
@@ -56,7 +58,9 @@ class Stats(BaseModel):
 
 # ------------------------------------------------------------ responses
 class GraphResponse(BaseModel):
-    root: str
+    root: str                          # local folder that was analysed (the clone, for URLs)
+    source_url: str | None = None      # the URL, when the analysis came from one
+    commit: str | None = None          # short hash of the cloned commit
     stats: Stats
     nodes: list[Node]
     edges: list[Edge]
@@ -89,4 +93,5 @@ class BrowseResponse(BaseModel):
 
 class Suggestion(BaseModel):
     label: str
-    path: str
+    path: str                    # a local folder or a repository URL
+    kind: str = "local"          # "local" | "remote" – the welcome screen groups them

@@ -14,6 +14,7 @@ from .browse import browse, suggestions
 from .graph import build
 from .models import (AnalyzeRequest, BrowseResponse, FileResponse, GraphResponse,
                      SummarizeRequest, SummaryResponse, Suggestion)
+from .remote import RemoteError, clone, is_url
 from .scanner import ScanError
 
 app = FastAPI(title="Repo Visualizer API")
@@ -55,9 +56,19 @@ def browse_dir(path: str | None = Query(None, description="Absolute directory; d
 
 @app.post("/api/analyze", response_model=GraphResponse)
 def analyze(req: AnalyzeRequest):
-    """Scan a local repository and return its dependency graph."""
+    """Scan a local folder – or clone a public repository URL – and return its dependency graph."""
+    target = req.path.strip()
     try:
-        graph = build(req.path)
+        if is_url(target):
+            root, commit = clone(target, refresh=req.refresh)
+            graph = build(str(root))
+            graph.source_url, graph.commit = target, commit
+        elif target.startswith("git@"):
+            raise RemoteError("Use the https:// form of the repository URL, e.g. https://github.com/owner/repo")
+        else:
+            graph = build(target)
+    except RemoteError as e:
+        raise HTTPException(status_code=e.status, detail=str(e))
     except ScanError as e:
         # 400 = the client sent something wrong (bad path); FastAPI turns this into JSON
         raise HTTPException(status_code=400, detail=str(e))

@@ -13,3 +13,6 @@ frontend/dist/
 .vscode/
 .idea/
 .DS_Store
+
+# cloned repositories (analyse-by-URL cache)
+backend/repos/

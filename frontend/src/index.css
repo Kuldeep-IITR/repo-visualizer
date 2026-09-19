@@ -246,3 +246,15 @@ kbd {
 /* ---------- folder list header ---------- */
 .folders-title { display: flex; justify-content: space-between; align-items: center; }
 .folders-title .link { font-family: inherit; font-size: 12px; font-weight: 500; }
+
+/* ---------- analysed-from-URL badge ---------- */
+.source-badge {
+  display: flex; align-items: center; gap: 6px; padding: 4px 6px 4px 10px; border: 1px solid #e2e8f0;
+  border-radius: 999px; background: #f8fafc; font-size: 12px; max-width: 360px;
+}
+.source-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: ui-monospace, monospace; }
+.source-commit { color: #64748b; font-family: ui-monospace, monospace; }
+.source-badge .icon-btn { font-size: 16px; padding: 0 4px; }
+
+.welcome-remote { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; }
+button.small-btn { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; font-size: 13px; }

@@ -1,8 +1,9 @@
 # Repo Visualizer
 
-**See how a codebase fits together.** Point Repo Visualizer at any folder on your computer and it draws an
-interactive map of the files, the imports between them, how big and complex each file is, and which files
-import each other in a loop. Click a file and an AI explains it in three sentences.
+**See how a codebase fits together.** Point Repo Visualizer at a folder on your computer, or paste the URL of
+any public GitHub repository, and it draws an interactive map of the files, the imports between them, how big
+and complex each file is, and which files import each other in a loop. Click a file and an AI explains it in
+three sentences.
 
 It runs entirely on your machine. Nothing is executed and nothing is uploaded, except the single file you
 choose to send to the AI.
@@ -14,7 +15,7 @@ choose to send to the AI.
 - [Features](#features)
 - [Quick start](#quick-start)
 - [User guide](#user-guide)
-  - [1. Choose a folder](#1-choose-a-folder)
+  - [1. Choose a folder or a GitHub URL](#1-choose-a-folder-or-a-github-url)
   - [2. Read the map](#2-read-the-map)
   - [3. Get around](#3-get-around)
   - [4. Inspect a file](#4-inspect-a-file)
@@ -31,6 +32,7 @@ choose to send to the AI.
 ## Features
 
 - **Dependency map** for Python, JavaScript, TypeScript, C and C++, built by static analysis. Your code is read, never run.
+- **Analyse by URL.** Paste `https://github.com/owner/repo` and the repository is downloaded (latest commit only) and mapped. Works for any public Git host with GitHub-style URLs.
 - **Folder boxes.** Files sit inside the folder they belong to, so the map mirrors the repository layout.
 - **Interactive canvas.** Drag, zoom, minimap, click a folder to zoom to it, click a file to fade everything unrelated.
 - **Metrics per file.** Code, comment and blank line counts plus cyclomatic complexity. Oversized files are outlined in red.
@@ -90,11 +92,11 @@ Everything else works without a key. The "Explain with AI" button simply tells y
 
 ## User guide
 
-### 1. Choose a folder
+### 1. Choose a folder or a GitHub URL
 
-![Welcome screen with Browse button, suggested folders and recent repositories](docs/welcome.png)
+![Welcome screen with Browse button, suggested folders, example GitHub repositories and recent analyses](docs/welcome.png)
 
-The welcome screen gives you three ways in:
+The welcome screen gives you four ways in:
 
 - **Browse folders…** opens a folder picker. Click a folder to open it, and click *Analyze* next to the one you
   want. Folders that contain a Git repository are tagged in green.
@@ -102,8 +104,21 @@ The welcome screen gives you three ways in:
   source, which is a good first look.
 - **Paste a path** into the box at the top. It must be an absolute path such as `/home/you/projects/app`
   or `C:\Users\you\projects\app`.
+- **Paste a GitHub URL** such as `https://github.com/psf/requests`, or pick one of the example repositories.
 
-Folders you have analysed before appear under *Recently analysed*, and the last path is remembered between visits.
+Folders and URLs you have analysed before appear under *Recently analysed*, and the last one is remembered
+between visits.
+
+**How URLs work.** The repository is shallow-cloned (only the latest commit, no history) into
+`backend/repos/`, then analysed like any local folder. The first analysis waits for the download, which
+takes a few seconds to a minute depending on the repository and your connection. After that the clone is
+reused, so re-analysing is instant. A badge in the top bar shows the repository name and the commit hash;
+its **↻** button downloads the latest commit and analyses again.
+
+- Public repositories only. A private or non-existent repository gives a clear error instead of a login prompt.
+- A specific branch works too: `https://github.com/owner/repo/tree/branch-name`.
+- GitLab (`…/-/tree/branch`) and Bitbucket URLs of the same shape are accepted.
+- To free disk space, delete `backend/repos/` at any time.
 
 ![Folder picker dialog](docs/picker.png)
 
@@ -223,7 +238,7 @@ Interactive docs with a "try it" button are at **http://localhost:8000/docs** wh
 | GET | `/api/health` | | `{ "status": "ok" }` |
 | GET | `/api/suggestions` | | `[{ label, path }]` starting points for the welcome screen |
 | GET | `/api/browse` | `?path=/abs/dir` (optional, defaults to home) | `{ path, parent, entries: [{ name, path, is_repo }] }` |
-| POST | `/api/analyze` | `{ "path": "/abs/dir" }` | `{ root, stats, nodes[], edges[] }` |
+| POST | `/api/analyze` | `{ "path": "/abs/dir" }` or `{ "path": "https://github.com/o/r", "refresh": false }` | `{ root, source_url, commit, stats, nodes[], edges[] }` |
 | GET | `/api/file` | `?path=src/main.py` | `{ path, content, truncated }` |
 | POST | `/api/summarize` | `{ "path": "src/main.py" }` | `{ summary, cached, model }` |
 
@@ -239,7 +254,8 @@ A node looks like this:
 
 An edge is `{ "id": "a.py->b.py", "source": "a.py", "target": "b.py", "circular": false }`, pointing from the
 importer to the imported file. `stats` carries `files`, `edges`, `total_loc`, `cycles`, `languages`,
-and `truncated` (true when the 1,500-file cap was hit).
+and `truncated` (true when the 1,500-file cap was hit). For a URL, `source_url` echoes the URL and `commit`
+is the short hash that was analysed; `refresh: true` discards the cached clone first.
 
 ## Configuration
 
@@ -253,6 +269,8 @@ and `truncated` (true when the 1,500-file cap was hit).
 | `backend/app/scanner.py` | `DEFAULT_IGNORED_DIRS` | `node_modules`, `.git`, … | Folders never scanned. |
 | `backend/app/metrics.py` | `BLOATED_LOC`, `BLOATED_COMPLEXITY` | `500`, `50` | Thresholds for the red outline. |
 | `backend/app/ai.py` | `MAX_AI_CHARS` | `40000` | Text sent to the AI is cut here. |
+| `backend/app/remote.py` | `REPOS_DIR` | `backend/repos/` | Where URL analyses are cloned to. |
+| `backend/app/remote.py` | `CLONE_TIMEOUT` | `300` | Seconds before a clone is abandoned. |
 
 ## Troubleshooting
 
@@ -275,6 +293,15 @@ and not binary.
 **An import I expected is not an arrow.** The resolver could not map it to a file in the folder, so it is listed
 under *External packages* instead. Common causes: path aliases other than `@/`, imports that rely on a
 `PYTHONPATH` outside the folder, and generated files.
+
+**"Repository not found, or it is private".** Check the URL in a browser. Only public repositories can be
+analysed by URL; clone a private one yourself and analyse the folder.
+
+**"Cloning took longer than 300 seconds".** Very large repository or slow connection. Clone it yourself with
+`git clone --depth 1 <url>` and analyse the folder, or raise `CLONE_TIMEOUT`.
+
+**"git is not installed".** URL analysis shells out to `git`. Install it from https://git-scm.com/ and make
+sure it is on your `PATH`.
 
 **"GEMINI_API_KEY is not set".** Add the key to `backend/.env` and restart the backend. See Quick start.
 
@@ -309,6 +336,7 @@ backend/
     graph.py       pipeline orchestration + cycle detection
     ai.py          Gemini + SQLite cache
     browse.py      folder picker + suggestions
+    remote.py      clone a repository URL into backend/repos/
     state.py       last analysis, path allowlist
     models.py      Pydantic schemas (the JSON contract)
   requirements.txt
