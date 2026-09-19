@@ -31,3 +31,10 @@ def safe_file_path(rel: str) -> Path:
     if rel not in current_files:
         raise LookupError(f"Unknown file: {rel}")
     return current_root / rel
+
+
+def forget(path: Path) -> None:
+    """Called when a cached clone is deleted: drop the analysis if it was the current one."""
+    global current, current_root, current_files
+    if current_root is not None and current_root.resolve() == path.resolve():
+        current, current_root, current_files = None, None, set()

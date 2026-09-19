@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useReactFlow } from "@xyflow/react";
-import { analyzeRepo, getHealth, getSuggestions, isRepoUrl } from "./api";
+import { analyzeRepo, getHealth, getSuggestions, isRepoUrl, listClones, removeClone, removeAllClones } from "./api";
 import RepoInput from "./components/RepoInput";
 import GraphCanvas from "./components/GraphCanvas";
 import SidePanel from "./components/SidePanel";
@@ -24,6 +24,7 @@ export default function App() {
   const [error, setError] = useState("");
   const [backendUp, setBackendUp] = useState(true);
   const [suggestions, setSuggestions] = useState([]);
+  const [clones, setClones] = useState([]);           // repositories downloaded for URL analysis
   const [recents, setRecents] = useState(() => readJSON(LS_RECENTS, []));
   const [showPicker, setShowPicker] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
@@ -31,10 +32,35 @@ export default function App() {
   const { fitView } = useReactFlow();
 
   // On load: is the backend there? What are good starting folders?
+  const loadClones = useCallback(() => listClones().then(setClones).catch(() => {}), []);
   useEffect(() => {
     getHealth().then(() => setBackendUp(true)).catch(() => setBackendUp(false));
     getSuggestions().then(setSuggestions).catch(() => {});
-  }, []);
+    loadClones();
+  }, [loadClones]);
+
+  // Delete a downloaded repository. If it is the one on screen, go back to the welcome screen.
+  async function handleRemoveClone(clone) {
+    if (!window.confirm(`Delete the downloaded copy of ${clone.url}?\nYou can download it again at any time.`)) return;
+    try {
+      await removeClone(clone.id);
+      if (graph?.clone_id === clone.id) { setGraph(null); setSelectedId(null); }
+      setRecents((r) => { const next = r.filter((p) => p !== clone.url); localStorage.setItem(LS_RECENTS, JSON.stringify(next)); return next; });
+      loadClones();
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+  async function handleRemoveAllClones() {
+    if (!window.confirm(`Delete all ${clones.length} downloaded repositories?`)) return;
+    try {
+      await removeAllClones();
+      if (graph?.clone_id) { setGraph(null); setSelectedId(null); }
+      loadClones();
+    } catch (e) {
+      setError(e.message);
+    }
+  }
 
   // Keyboard shortcuts. Ignored while typing in an input.
   useEffect(() => {
@@ -64,6 +90,7 @@ export default function App() {
       const g = await analyzeRepo(target, refresh);
       setGraph(g);
       setBackendUp(true);
+      if (g.clone_id) loadClones();
       localStorage.setItem(LS_LAST, target);
       const next = [target, ...recents.filter((r) => r !== target)].slice(0, 6);
       setRecents(next);
@@ -142,6 +169,9 @@ export default function App() {
             <span className="source-commit" title="Commit that was analysed">@{graph.commit}</span>
             <button className="icon-btn" onClick={() => handleAnalyze(graph.source_url, true)} disabled={!!loading}
                     title="Download the latest commit and analyse again">↻</button>
+            <button className="icon-btn" disabled={!!loading}
+                    onClick={() => handleRemoveClone({ id: graph.clone_id, url: graph.source_url })}
+                    title="Delete the downloaded copy from this computer">🗑</button>
           </div>
         )}
         <button className="icon-btn help-btn" onClick={() => setShowHelp(true)} title="How to read the map (?)">?</button>
@@ -178,8 +208,11 @@ export default function App() {
             <Welcome
               suggestions={suggestions}
               recents={recents}
+              clones={clones}
               onPick={handleAnalyze}
               onBrowse={() => setShowPicker(true)}
+              onRemoveClone={handleRemoveClone}
+              onRemoveAllClones={handleRemoveAllClones}
               loading={!!loading}
             />
           )}

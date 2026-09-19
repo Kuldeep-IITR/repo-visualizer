@@ -258,3 +258,12 @@ kbd {
 
 .welcome-remote { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; }
 button.small-btn { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; font-size: 13px; }
+
+/* ---------- downloaded repositories (welcome) ---------- */
+.clones { border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 12px; margin: 4px 0 14px; }
+.clones-head { display: flex; justify-content: space-between; align-items: center; font-weight: 600; margin-bottom: 6px; }
+.clones-head .link, .clone-remove { font-family: inherit; font-size: 12px; }
+.clones ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.clones li { display: flex; align-items: center; gap: 10px; }
+.clone-name { font-size: 13px; }
+.clone-remove { margin-left: auto; color: #b91c1c; }

@@ -5,6 +5,8 @@ FastAPI is a Python web framework. You create one `app` object, then attach
 functions to URL paths with decorators like @app.get("/api/health").
 Uvicorn is the server that actually listens on a port and hands requests to `app`.
 """
+from pathlib import Path
+
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -12,9 +14,10 @@ from . import state
 from .ai import AIError, summarize
 from .browse import browse, suggestions
 from .graph import build
-from .models import (AnalyzeRequest, BrowseResponse, FileResponse, GraphResponse,
-                     SummarizeRequest, SummaryResponse, Suggestion)
-from .remote import RemoteError, clone, is_url
+from .models import (AnalyzeRequest, BrowseResponse, CloneInfo, FileResponse, GraphResponse,
+                     RemoveResponse, SummarizeRequest, SummaryResponse, Suggestion)
+from .remote import (REPOS_DIR, RemoteError, clone, clone_id_for, is_url, list_clones,
+                     remove_all_clones, remove_clone)
 from .scanner import ScanError
 
 app = FastAPI(title="Repo Visualizer API")
@@ -62,7 +65,7 @@ def analyze(req: AnalyzeRequest):
         if is_url(target):
             root, commit = clone(target, refresh=req.refresh)
             graph = build(str(root))
-            graph.source_url, graph.commit = target, commit
+            graph.source_url, graph.commit, graph.clone_id = target, commit, clone_id_for(root)
         elif target.startswith("git@"):
             raise RemoteError("Use the https:// form of the repository URL, e.g. https://github.com/owner/repo")
         else:
@@ -100,3 +103,29 @@ def summarize_file(req: SummarizeRequest):
     except AIError as e:
         raise HTTPException(status_code=e.status, detail=str(e))
     return SummaryResponse(summary=summary, cached=cached, model=model)
+
+
+@app.get("/api/clones", response_model=list[CloneInfo])
+def get_clones():
+    """Repositories downloaded for URL analysis, with their size on disk."""
+    return list_clones()
+
+
+@app.delete("/api/clones", response_model=RemoveResponse)
+def delete_clones(id: str | None = Query(None, description="Clone id from GET /api/clones"),
+                  all: bool = Query(False, description="Remove every downloaded repository")):
+    """Delete one downloaded repository (?id=) or all of them (?all=true)."""
+    if not id and not all:
+        raise HTTPException(status_code=400, detail="Pass ?id=<clone id> or ?all=true")
+    try:
+        if all:
+            for info in list_clones():
+                state.forget(Path(info.path))
+            removed, freed = remove_all_clones()
+        else:
+            state.forget(REPOS_DIR / id)
+            freed = remove_clone(id)
+            removed = [id]
+    except RemoteError as e:
+        raise HTTPException(status_code=e.status, detail=str(e))
+    return RemoveResponse(removed=removed, freed_bytes=freed)

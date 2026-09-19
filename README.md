@@ -8,7 +8,7 @@ three sentences.
 It runs entirely on your machine. Nothing is executed and nothing is uploaded, except the single file you
 choose to send to the AI.
 
-![Repo Visualizer: dependency map with a file selected and its AI summary](docs/panel.png)
+![Demo: pick a folder, zoom to a package, open a file, get an AI summary, search](docs/demo.gif)
 
 ## Contents
 
@@ -32,7 +32,7 @@ choose to send to the AI.
 ## Features
 
 - **Dependency map** for Python, JavaScript, TypeScript, C and C++, built by static analysis. Your code is read, never run.
-- **Analyse by URL.** Paste `https://github.com/owner/repo` and the repository is downloaded (latest commit only) and mapped. Works for any public Git host with GitHub-style URLs.
+- **Analyse by URL.** Paste `https://github.com/owner/repo` and the repository is downloaded (latest commit only) and mapped. Works for any public Git host with GitHub-style URLs. Downloads are listed with their size and can be removed in one click.
 - **Folder boxes.** Files sit inside the folder they belong to, so the map mirrors the repository layout.
 - **Interactive canvas.** Drag, zoom, minimap, click a folder to zoom to it, click a file to fade everything unrelated.
 - **Metrics per file.** Code, comment and blank line counts plus cyclomatic complexity. Oversized files are outlined in red.
@@ -118,7 +118,15 @@ its **↻** button downloads the latest commit and analyses again.
 - Public repositories only. A private or non-existent repository gives a clear error instead of a login prompt.
 - A specific branch works too: `https://github.com/owner/repo/tree/branch-name`.
 - GitLab (`…/-/tree/branch`) and Bitbucket URLs of the same shape are accepted.
-- To free disk space, delete `backend/repos/` at any time.
+
+**Removing downloads.** Nothing is deleted automatically. When you no longer need a repository:
+
+- press the **🗑** button in the top-bar badge while it is open, or
+- use the **Downloaded repositories** list on the welcome screen, which shows every download with its size on
+  disk and offers *remove* per repository and *Remove all*.
+
+Either way you are asked to confirm, and the repository can be downloaded again at any time. Deleting the
+`backend/repos/` folder by hand does the same thing.
 
 ![Folder picker dialog](docs/picker.png)
 
@@ -155,6 +163,8 @@ listed per file in the side panel under *External packages*.
 - The **minimap** in the bottom-right corner shows where you are. Drag it to move.
 
 ### 4. Inspect a file
+
+![File selected: side panel with metrics, AI summary, imports and source](docs/panel.png)
 
 Click a card. Everything unrelated fades, the file's neighbours stay bright, and the side panel opens:
 
@@ -241,6 +251,8 @@ Interactive docs with a "try it" button are at **http://localhost:8000/docs** wh
 | POST | `/api/analyze` | `{ "path": "/abs/dir" }` or `{ "path": "https://github.com/o/r", "refresh": false }` | `{ root, source_url, commit, stats, nodes[], edges[] }` |
 | GET | `/api/file` | `?path=src/main.py` | `{ path, content, truncated }` |
 | POST | `/api/summarize` | `{ "path": "src/main.py" }` | `{ summary, cached, model }` |
+| GET | `/api/clones` | | `[{ id, url, path, commit, size_bytes, cloned_at }]` downloaded repositories |
+| DELETE | `/api/clones` | `?id=github.com/owner/repo` or `?all=true` | `{ removed[], freed_bytes }` |
 
 A node looks like this:
 
@@ -254,8 +266,9 @@ A node looks like this:
 
 An edge is `{ "id": "a.py->b.py", "source": "a.py", "target": "b.py", "circular": false }`, pointing from the
 importer to the imported file. `stats` carries `files`, `edges`, `total_loc`, `cycles`, `languages`,
-and `truncated` (true when the 1,500-file cap was hit). For a URL, `source_url` echoes the URL and `commit`
-is the short hash that was analysed; `refresh: true` discards the cached clone first.
+and `truncated` (true when the 1,500-file cap was hit). For a URL, `source_url` echoes the URL, `commit`
+is the short hash that was analysed and `clone_id` is the handle for `DELETE /api/clones`; `refresh: true`
+discards the cached clone first.
 
 ## Configuration
 

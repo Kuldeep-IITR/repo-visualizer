@@ -61,6 +61,7 @@ class GraphResponse(BaseModel):
     root: str                          # local folder that was analysed (the clone, for URLs)
     source_url: str | None = None      # the URL, when the analysis came from one
     commit: str | None = None          # short hash of the cloned commit
+    clone_id: str | None = None        # id for /api/clones, so the UI can offer "remove"
     stats: Stats
     nodes: list[Node]
     edges: list[Edge]
@@ -95,3 +96,18 @@ class Suggestion(BaseModel):
     label: str
     path: str                    # a local folder or a repository URL
     kind: str = "local"          # "local" | "remote" – the welcome screen groups them
+
+
+# ------------------------------------------------------------ cloned repositories
+class CloneInfo(BaseModel):
+    id: str                      # "github.com/owner/repo" or "…/repo@branch"
+    url: str
+    path: str
+    commit: str
+    size_bytes: int
+    cloned_at: str               # ISO timestamp
+
+
+class RemoveResponse(BaseModel):
+    removed: list[str]
+    freed_bytes: int

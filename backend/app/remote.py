@@ -16,8 +16,11 @@ import os
 import re
 import shutil
 import subprocess
+from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlparse
+
+from .models import CloneInfo
 
 REPOS_DIR = Path(__file__).resolve().parent.parent / "repos"
 CLONE_TIMEOUT = 300          # seconds; the 1,500-file cap in the scanner handles size after that
@@ -112,3 +115,73 @@ def _explain(stderr: str, branch: str | None) -> tuple[str, int]:
         return "Could not reach the Git host. Check your internet connection.", 502
     last = stderr.strip().splitlines()[-1] if stderr.strip() else "unknown error"
     return f"git clone failed: {last}", 502
+
+
+# ---------------------------------------------------------------- managing the cache
+# A clone id is its path relative to REPOS_DIR: "github.com/psf/requests" or
+# "github.com/psf/requests@main". Three segments, nothing else, so it can never
+# point outside the cache folder.
+_ID = re.compile(r"^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+(@[A-Za-z0-9._-]+)?$")
+
+
+def clone_id_for(path: Path) -> str | None:
+    """Reverse of the dest calculation in clone(); None if the path is not a cached clone."""
+    try:
+        rel = path.resolve().relative_to(REPOS_DIR.resolve()).as_posix()
+    except ValueError:
+        return None
+    return rel if _ID.match(rel) else None
+
+
+def _dir_size(path: Path) -> int:
+    return sum(f.stat().st_size for f in path.rglob("*") if f.is_file())
+
+
+def _info(path: Path) -> CloneInfo:
+    host, owner, last = path.relative_to(REPOS_DIR).parts
+    repo, _, branch = last.partition("@")
+    head = subprocess.run(["git", "-C", str(path), "rev-parse", "--short", "HEAD"], capture_output=True, text=True)
+    return CloneInfo(
+        id=f"{host}/{owner}/{last}",
+        url=f"https://{host}/{owner}/{repo}" + (f"/tree/{branch}" if branch else ""),
+        path=str(path),
+        commit=head.stdout.strip() or "unknown",
+        size_bytes=_dir_size(path),
+        cloned_at=datetime.fromtimestamp(path.stat().st_mtime, timezone.utc).isoformat(timespec="seconds"),
+    )
+
+
+def list_clones() -> list[CloneInfo]:
+    if not REPOS_DIR.is_dir():
+        return []
+    out = []
+    for host in sorted(REPOS_DIR.iterdir()):
+        for owner in sorted(p for p in host.iterdir() if p.is_dir()) if host.is_dir() else []:
+            for repo in sorted(p for p in owner.iterdir() if p.is_dir()):
+                if (repo / ".git").exists():
+                    out.append(_info(repo))
+    return out
+
+
+def remove_clone(clone_id: str) -> int:
+    """Delete one cached clone. Returns bytes freed. Raises RemoteError(404) if unknown."""
+    if not _ID.match(clone_id):
+        raise RemoteError("Not a valid clone id", 400)
+    path = (REPOS_DIR / clone_id).resolve()
+    if REPOS_DIR.resolve() not in path.parents or not (path / ".git").exists():
+        raise RemoteError("No such downloaded repository", 404)
+    freed = _dir_size(path)
+    shutil.rmtree(path)
+    # tidy empty host/owner folders left behind
+    for parent in (path.parent, path.parent.parent):
+        if parent != REPOS_DIR and parent.is_dir() and not any(parent.iterdir()):
+            parent.rmdir()
+    return freed
+
+
+def remove_all_clones() -> tuple[list[str], int]:
+    removed, freed = [], 0
+    for info in list_clones():
+        freed += remove_clone(info.id)
+        removed.append(info.id)
+    return removed, freed

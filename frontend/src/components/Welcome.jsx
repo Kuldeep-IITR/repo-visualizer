@@ -4,8 +4,11 @@ const GitHubIcon = () => (
   </svg>
 );
 
+import { formatBytes } from "../api";
+
 // The empty state: what to do, plus one-click starting points.
-export default function Welcome({ suggestions, recents, onPick, onBrowse, loading }) {
+export default function Welcome({ suggestions, recents, clones = [], onPick, onBrowse, onRemoveClone, onRemoveAllClones, loading }) {
+  const totalBytes = clones.reduce((s, c) => s + c.size_bytes, 0);
   return (
     <div className="welcome">
       <div className="welcome-card">
@@ -46,6 +49,29 @@ export default function Welcome({ suggestions, recents, onPick, onBrowse, loadin
             {recents.map((p) => (
               <button key={p} className="link" onClick={() => onPick(p)} disabled={loading}>{p}</button>
             ))}
+          </div>
+        )}
+
+        {clones.length > 0 && (
+          <div className="clones">
+            <div className="clones-head">
+              <span>Downloaded repositories <span className="muted small">({clones.length}, {formatBytes(totalBytes)} on disk)</span></span>
+              <button className="link" onClick={onRemoveAllClones} disabled={loading}>Remove all</button>
+            </div>
+            <ul>
+              {clones.map((c) => (
+                <li key={c.id}>
+                  <button className="link clone-name" onClick={() => onPick(c.url)} disabled={loading} title={`Analyse ${c.url}`}>
+                    {c.url.replace(/^https?:\/\//, "")}
+                  </button>
+                  <span className="muted small">@{c.commit} · {formatBytes(c.size_bytes)}</span>
+                  <button className="link clone-remove" onClick={() => onRemoveClone(c)} disabled={loading} title="Delete this download">
+                    remove
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <div className="muted small">Downloads are kept so re-analysing is instant. Remove them whenever you like; they can be fetched again.</div>
           </div>
         )}
 
