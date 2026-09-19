@@ -50,6 +50,8 @@ class Stats(BaseModel):
     total_loc: int
     cycles: int
     languages: dict[str, int]    # {"python": 30, "javascript": 12}
+    truncated: bool = False      # True if the scanner hit its file cap – graph is partial
+    max_files: int = 0           # the cap, so the UI can say "showing first N files"
 
 
 # ------------------------------------------------------------ responses
@@ -70,3 +72,21 @@ class SummaryResponse(BaseModel):
     summary: str
     cached: bool
     model: str
+
+
+# ------------------------------------------------------------ folder browser
+class DirEntry(BaseModel):
+    name: str
+    path: str                    # absolute
+    is_repo: bool                # has a .git folder -> highlighted as a good pick
+
+
+class BrowseResponse(BaseModel):
+    path: str                    # the directory being listed (absolute)
+    parent: str | None           # None at filesystem root
+    entries: list[DirEntry]      # sub-directories only, hidden ones excluded
+
+
+class Suggestion(BaseModel):
+    label: str
+    path: str

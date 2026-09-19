@@ -23,7 +23,12 @@ export default function FolderList({ graph, hideIsolated, onToggleIsolated, isol
   return (
     <aside className="folders">
       <div className="folders-head">
-        <span>Folders <span className="muted small">({folders.length})</span></span>
+        <div className="folders-title">
+          <span>Folders <span className="muted small">({folders.length})</span></span>
+          <button className="link" onClick={() => fitView({ padding: 0.05, duration: 400, maxZoom: 1 })} title="Zoom out to show everything">
+            fit all
+          </button>
+        </div>
         <label className="small" title="Files that neither import nor are imported by anything">
           <input type="checkbox" checked={hideIsolated} onChange={onToggleIsolated} />
           hide isolated ({isolatedCount})
@@ -32,7 +37,7 @@ export default function FolderList({ graph, hideIsolated, onToggleIsolated, isol
       <ul>
         {folders.map(([dir, count]) => (
           <li key={dir}>
-            <button className="folder-row" onClick={() => focus(dir)} title={dir || "(root)"}>
+            <button className="folder-row" onClick={() => focus(dir)} title={`Zoom to ${dir || "(root)"}`}>
               <span className="folder-row-name">{dir || "(root)"}</span>
               <span className="folder-row-count">{count}</span>
             </button>

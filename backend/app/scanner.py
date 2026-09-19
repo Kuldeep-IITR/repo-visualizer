@@ -61,6 +61,13 @@ def _is_binary(path: Path) -> bool:
 
 
 def scan(root_str: str) -> list[str]:
+    """Convenience wrapper: just the file list."""
+    return scan_with_info(root_str)[0]
+
+
+def scan_with_info(root_str: str) -> tuple[list[str], bool]:
+    """Returns (files, truncated). truncated=True means MAX_FILES was hit and the
+    list is incomplete – the UI shows a warning so nobody trusts a partial graph."""
     root = Path(root_str).expanduser()
     if not root.is_absolute():
         raise ScanError("Path must be absolute, e.g. /home/you/project")
@@ -106,6 +113,6 @@ def scan(root_str: str) -> list[str]:
 
             files.append(rel)
             if len(files) >= MAX_FILES:
-                return sorted(files)
+                return sorted(files), True
 
-    return sorted(files)
+    return sorted(files), False

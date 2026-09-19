@@ -103,6 +103,9 @@ export default function GraphCanvas({ graph, selectedId, matches, onSelect }) {
       onPaneClick={onPaneClick}
       minZoom={0.02}
       maxZoom={2.5}
+      // Big graphs: skip rendering nodes/edges that are off-screen. Huge win at 1000+ files,
+      // and unnoticeable below that, so we only switch it on when it matters.
+      onlyRenderVisibleElements={nodes.length > 400}
     >
       <Background gap={20} color="#e2e8f0" />
       <Controls />

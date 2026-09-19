@@ -15,7 +15,7 @@ from .metrics import compute
 from .models import Edge, GraphResponse, Loc, Node, Stats
 from .parsers import extract_imports
 from .resolver import resolve
-from .scanner import language_of, scan
+from .scanner import MAX_FILES, language_of, scan_with_info
 
 
 def _read(path: Path) -> str:
@@ -79,7 +79,7 @@ def _find_cycles(nodes: list[str], adj: dict[str, set[str]]) -> tuple[set[str], 
 
 # ---------------------------------------------------------------- build
 def build(root_str: str) -> GraphResponse:
-    files = scan(root_str)                       # validates the path (raises ScanError)
+    files, truncated = scan_with_info(root_str)  # validates the path (raises ScanError)
     root = Path(root_str).expanduser().resolve()
     fset = set(files)
 
@@ -122,7 +122,8 @@ def build(root_str: str) -> GraphResponse:
     return GraphResponse(
         root=str(root),
         stats=Stats(files=len(nodes), edges=len(edges), total_loc=total_loc,
-                    cycles=cycle_groups, languages=dict(languages)),
+                    cycles=cycle_groups, languages=dict(languages),
+                    truncated=truncated, max_files=MAX_FILES),
         nodes=nodes,
         edges=edges,
     )

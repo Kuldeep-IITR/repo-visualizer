@@ -10,8 +10,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from . import state
 from .ai import AIError, summarize
+from .browse import browse, suggestions
 from .graph import build
-from .models import AnalyzeRequest, FileResponse, GraphResponse, SummarizeRequest, SummaryResponse
+from .models import (AnalyzeRequest, BrowseResponse, FileResponse, GraphResponse,
+                     SummarizeRequest, SummaryResponse, Suggestion)
 from .scanner import ScanError
 
 app = FastAPI(title="Repo Visualizer API")
@@ -22,7 +24,8 @@ app = FastAPI(title="Repo Visualizer API")
 # API explicitly allows it. This middleware adds the "yes, allowed" headers.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    # both spellings of "this machine": people open either one and the browser treats them as different origins
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -33,6 +36,21 @@ MAX_PREVIEW_CHARS = 100_000   # the side panel shows a preview, not a 5 MB file
 @app.get("/api/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/api/suggestions", response_model=list[Suggestion])
+def get_suggestions():
+    """Starting points for the welcome screen (this project, ~/Desktop, home ...)."""
+    return suggestions()
+
+
+@app.get("/api/browse", response_model=BrowseResponse)
+def browse_dir(path: str | None = Query(None, description="Absolute directory; defaults to your home folder")):
+    """List sub-directories so the UI can offer a folder picker."""
+    try:
+        return browse(path)
+    except (ValueError, FileNotFoundError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @app.post("/api/analyze", response_model=GraphResponse)

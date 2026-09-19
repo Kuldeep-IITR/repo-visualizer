@@ -1,7 +1,15 @@
 // All calls to the Python backend live here, so components never hard-code URLs.
-const BASE = "http://localhost:8000/api";
+// Override with VITE_API_URL in frontend/.env if the backend runs somewhere else.
+export const BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8000/api";
 
-async function handle(res) {
+async function request(path, options) {
+  let res;
+  try {
+    res = await fetch(`${BASE}${path}`, options);
+  } catch {
+    // fetch() only throws when the request never got an answer: server down, wrong port, CORS.
+    throw new Error(`Cannot reach the backend at ${BASE}. Is it running? Start it with ./run.sh`);
+  }
   if (res.ok) return res.json();
   // FastAPI puts its error message under "detail"; fall back to the status code.
   let detail = `HTTP ${res.status}`;
@@ -12,26 +20,15 @@ async function handle(res) {
   throw new Error(detail);
 }
 
-export async function getHealth() {
-  return handle(await fetch(`${BASE}/health`));
-}
+const json = (body) => ({
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(body),
+});
 
-export async function analyzeRepo(path) {
-  return handle(await fetch(`${BASE}/analyze`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path }),
-  }));
-}
-
-export async function getFile(path) {
-  return handle(await fetch(`${BASE}/file?path=${encodeURIComponent(path)}`));
-}
-
-export async function summarizeFile(path) {
-  return handle(await fetch(`${BASE}/summarize`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path }),
-  }));
-}
+export const getHealth = () => request("/health");
+export const getSuggestions = () => request("/suggestions");
+export const browseDir = (path) => request(`/browse${path ? `?path=${encodeURIComponent(path)}` : ""}`);
+export const analyzeRepo = (path) => request("/analyze", json({ path }));
+export const getFile = (path) => request(`/file?path=${encodeURIComponent(path)}`);
+export const summarizeFile = (path) => request("/summarize", json({ path }));

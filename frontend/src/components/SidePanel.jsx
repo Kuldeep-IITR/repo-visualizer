@@ -51,7 +51,11 @@ export default function SidePanel({ graph, node, onSelect, onClose }) {
 
       <div className="panel-row">
         <span className="chip" style={{ background: color }}>{node.language}</span>
-        {node.bloated && <span className="chip chip-red">bloated</span>}
+        {node.bloated && (
+          <span className="chip chip-red" title="Over 500 lines of code or complexity above 50 – a candidate for splitting up">
+            bloated
+          </span>
+        )}
       </div>
 
       <section>
@@ -61,14 +65,17 @@ export default function SidePanel({ graph, node, onSelect, onClose }) {
           <Metric label="comment" value={node.loc.comment} />
           <Metric label="blank" value={node.loc.blank} />
           <Metric label="total" value={node.loc.total} />
-          <Metric label="complexity" value={node.complexity} warn={node.complexity > 50} />
+          <Metric label="complexity" value={node.complexity} warn={node.complexity > 50}
+                  title="Cyclomatic complexity: number of independent paths through the code. 1 = straight line; every if / loop / && adds one." />
         </div>
       </section>
 
       <section>
         <h3>AI summary</h3>
         {ai.status === "idle" && (
-          <button className="primary" onClick={explain}>Explain with AI</button>
+          <button className="primary" onClick={explain} title="Send this file to Gemini and get a 3-sentence summary (cached per file content)">
+            Explain with AI
+          </button>
         )}
         {ai.status === "loading" && <div className="muted">Asking Gemini…</div>}
         {ai.status === "done" && (
@@ -107,9 +114,9 @@ export default function SidePanel({ graph, node, onSelect, onClose }) {
   );
 }
 
-function Metric({ label, value, warn }) {
+function Metric({ label, value, warn, title }) {
   return (
-    <div className={"metric" + (warn ? " warn" : "")}>
+    <div className={"metric" + (warn ? " warn" : "")} title={title}>
       <b>{value}</b>
       <span>{label}</span>
     </div>
