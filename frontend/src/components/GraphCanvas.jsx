@@ -1,26 +1,16 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import {
   ReactFlow, Background, Controls, MiniMap, MarkerType,
-  useNodesState, useEdgesState,
+  useNodesState, useEdgesState, useReactFlow, useNodesInitialized,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
 import FileNode, { LANGUAGE_COLORS } from "./FileNode";
-import { layoutGraph } from "./../layout";
+import FolderNode from "./FolderNode";
+import { buildLayout } from "../layout";
 
-// Tell React Flow that type "file" means "render with FileNode".
 // Defined outside the component so the object identity never changes (React Flow warns otherwise).
-const nodeTypes = { file: FileNode };
-
-// Convert backend JSON -> React Flow node/edge objects.
-function toFlowNodes(graph) {
-  return graph.nodes.map((n) => ({
-    id: n.id,
-    type: "file",
-    data: { ...n, dimmed: false },
-    position: { x: 0, y: 0 },       // dagre overwrites this
-  }));
-}
+const nodeTypes = { file: FileNode, folder: FolderNode };
 
 function toFlowEdges(graph) {
   return graph.edges.map((e) => ({
@@ -28,9 +18,8 @@ function toFlowEdges(graph) {
     source: e.source,
     target: e.target,
     animated: e.circular,
-    className: e.circular ? "edge-circular" : "",
-    markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16, color: e.circular ? "#dc2626" : "#94a3b8" },
-    style: { stroke: e.circular ? "#dc2626" : "#94a3b8", strokeWidth: e.circular ? 2 : 1.5 },
+    markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16, color: e.circular ? "#dc2626" : "#64748b" },
+    style: { stroke: e.circular ? "#dc2626" : "#64748b", strokeWidth: e.circular ? 2 : 1.5 },
   }));
 }
 
@@ -39,14 +28,32 @@ export default function GraphCanvas({ graph, selectedId, matches, onSelect }) {
   // dragged positions for us and give back an onChange handler to wire up.
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const { fitView } = useReactFlow();
+  const initialized = useNodesInitialized();     // true once every node has been measured
+  const pendingFit = useRef(false);
 
   // New graph from the backend -> lay it out once and load it.
   useEffect(() => {
     if (!graph) return;
-    const flowEdges = toFlowEdges(graph);
-    setNodes(layoutGraph(toFlowNodes(graph), flowEdges));
-    setEdges(flowEdges);
+    setNodes(buildLayout(graph));
+    setEdges(toFlowEdges(graph));
+    pendingFit.current = true;
   }, [graph, setNodes, setEdges]);
+
+  // Once the new nodes are measured, fit the whole graph into view.
+  useEffect(() => {
+    if (initialized && pendingFit.current) {
+      pendingFit.current = false;
+      fitView({ padding: 0.05, maxZoom: 1 });
+    }
+  }, [initialized, fitView]);
+
+  // Search matches changed -> zoom to them.
+  useEffect(() => {
+    if (matches && matches.size > 0 && initialized) {
+      fitView({ nodes: [...matches].map((id) => ({ id })), padding: 0.4, duration: 300, maxZoom: 1.25 });
+    }
+  }, [matches, initialized, fitView]);
 
   // Selection or search changed -> dim everything that is not relevant.
   //   selection: keep the node + its direct neighbours
@@ -64,22 +71,25 @@ export default function GraphCanvas({ graph, selectedId, matches, onSelect }) {
     } else if (matches) {
       keep = matches;
     }
-    setNodes((nds) => nds.map((n) => ({
+    setNodes((nds) => nds.map((n) => n.type !== "file" ? n : ({
       ...n,
       selected: n.id === selectedId,
       data: { ...n.data, dimmed: keep ? !keep.has(n.id) : false },
     })));
     setEdges((eds) => eds.map((e) => {
       const touches = e.source === selectedId || e.target === selectedId;
-      return {
-        ...e,
-        style: { ...e.style, opacity: selectedId && !touches ? 0.15 : 1 },
-        zIndex: touches ? 1 : 0,
-      };
+      return { ...e, style: { ...e.style, opacity: selectedId && !touches ? 0.12 : 1 } };
     }));
   }, [selectedId, matches, graph, setNodes, setEdges]);
 
-  const onNodeClick = useCallback((_, node) => onSelect(node.id), [onSelect]);
+  const onNodeClick = useCallback((_, node) => {
+    if (node.type === "folder") {
+      // clicking a folder box zooms to it instead of selecting it
+      fitView({ nodes: [{ id: node.id }], padding: 0.15, duration: 400, maxZoom: 1.2 });
+      return;
+    }
+    onSelect(node.id);
+  }, [onSelect, fitView]);
   const onPaneClick = useCallback(() => onSelect(null), [onSelect]);
 
   return (
@@ -91,15 +101,18 @@ export default function GraphCanvas({ graph, selectedId, matches, onSelect }) {
       onEdgesChange={onEdgesChange}
       onNodeClick={onNodeClick}
       onPaneClick={onPaneClick}
-      fitView
-      minZoom={0.05}
+      minZoom={0.02}
+      maxZoom={2.5}
     >
       <Background gap={20} color="#e2e8f0" />
       <Controls />
       <MiniMap
         pannable
         zoomable
-        nodeColor={(n) => LANGUAGE_COLORS[n.data.language] ?? LANGUAGE_COLORS.unknown}
+        nodeStrokeWidth={4}
+        nodeColor={(n) => n.type === "folder"
+          ? "#cbd5e1"
+          : (LANGUAGE_COLORS[n.data.language] ?? LANGUAGE_COLORS.unknown)}
       />
     </ReactFlow>
   );

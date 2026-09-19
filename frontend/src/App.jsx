@@ -1,16 +1,20 @@
 import { useCallback, useMemo, useState } from "react";
+import { useReactFlow } from "@xyflow/react";
 import { analyzeRepo } from "./api";
 import RepoInput from "./components/RepoInput";
 import GraphCanvas from "./components/GraphCanvas";
 import SidePanel from "./components/SidePanel";
+import FolderList from "./components/FolderList";
 import { LANGUAGE_COLORS } from "./components/FileNode";
 
 export default function App() {
   const [graph, setGraph] = useState(null);       // the JSON from /api/analyze
   const [selectedId, setSelectedId] = useState(null);
   const [search, setSearch] = useState("");
+  const [hideIsolated, setHideIsolated] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const { fitView } = useReactFlow();
 
   async function handleAnalyze(path) {
     setLoading(true);
@@ -26,16 +30,35 @@ export default function App() {
     }
   }
 
+  // Files that neither import nor are imported by anything.
+  const isolatedIds = useMemo(() => {
+    if (!graph) return new Set();
+    const connected = new Set(graph.edges.flatMap((e) => [e.source, e.target]));
+    return new Set(graph.nodes.filter((n) => !connected.has(n.id)).map((n) => n.id));
+  }, [graph]);
+
+  // What the canvas actually shows (edges never touch isolated files, so they all stay).
+  const visibleGraph = useMemo(() => {
+    if (!graph || !hideIsolated) return graph;
+    return { ...graph, nodes: graph.nodes.filter((n) => !isolatedIds.has(n.id)) };
+  }, [graph, hideIsolated, isolatedIds]);
+
   // useCallback keeps the same function identity between renders, so the
   // canvas's effects don't re-run just because App re-rendered.
   const handleSelect = useCallback((id) => setSelectedId(id), []);
 
+  // Select AND zoom to a file – used by links in the side panel.
+  const focusNode = useCallback((id) => {
+    setSelectedId(id);
+    fitView({ nodes: [{ id }], padding: 0.6, duration: 400, maxZoom: 1.4 });
+  }, [fitView]);
+
   // Node ids whose path contains the search text (case-insensitive).
   const matches = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q || !graph) return null;                // null = no filter active
-    return new Set(graph.nodes.filter((n) => n.path.toLowerCase().includes(q)).map((n) => n.id));
-  }, [search, graph]);
+    if (!q || !visibleGraph) return null;                // null = no filter active
+    return new Set(visibleGraph.nodes.filter((n) => n.path.toLowerCase().includes(q)).map((n) => n.id));
+  }, [search, visibleGraph]);
 
   const selectedNode = graph?.nodes.find((n) => n.id === selectedId) ?? null;
   const stats = graph?.stats;
@@ -67,24 +90,22 @@ export default function App() {
       {error && <div className="error">{error}</div>}
 
       <div className="body">
+        {graph && (
+          <FolderList
+            graph={visibleGraph}
+            hideIsolated={hideIsolated}
+            isolatedCount={isolatedIds.size}
+            onToggleIsolated={() => { setHideIsolated((v) => !v); setSelectedId(null); }}
+            languages={stats.languages}
+          />
+        )}
+
         <main className="canvas">
           {graph ? (
-            <GraphCanvas graph={graph} selectedId={selectedId} matches={matches} onSelect={handleSelect} />
+            <GraphCanvas graph={visibleGraph} selectedId={selectedId} matches={matches} onSelect={handleSelect} />
           ) : (
             <div className="empty">
               {loading ? "Scanning…" : "Enter the absolute path of a local repository to map its imports."}
-            </div>
-          )}
-          {graph && (
-            <div className="legend">
-              {Object.entries(stats.languages).map(([lang, count]) => (
-                <span key={lang}>
-                  <i style={{ background: LANGUAGE_COLORS[lang] ?? LANGUAGE_COLORS.unknown }} />
-                  {lang} ({count})
-                </span>
-              ))}
-              <span><i className="legend-bloated" />bloated</span>
-              <span><i className="legend-cycle" />cycle</span>
             </div>
           )}
         </main>
@@ -95,7 +116,7 @@ export default function App() {
             key={selectedNode.id}
             graph={graph}
             node={selectedNode}
-            onSelect={handleSelect}
+            onSelect={focusNode}
             onClose={() => setSelectedId(null)}
           />
         )}

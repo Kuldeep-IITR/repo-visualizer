@@ -8,13 +8,14 @@ with per-file metrics, import-cycle detection, and one-click AI summaries.
 ## Features
 
 - **Dependency graph** of Python, JavaScript/TypeScript and C/C++ files, built by static analysis (no code is executed)
-- **Interactive canvas** (React Flow): drag nodes, zoom, minimap, auto-layout with dagre
+- **Interactive canvas** (React Flow): drag nodes, zoom, minimap
+- **Folder grouping**: files sit inside labelled folder boxes; connected files/folders are laid out with dagre, unrelated ones are packed into a grid so a repo of 50 unrelated scripts is a block, not a 50-wide line
+- **Navigation**: folder list that zooms to any folder, search that zooms to matches, side-panel links that centre a file, and a "hide isolated files" toggle
 - **Metrics per file**: code / comment / blank lines and cyclomatic complexity; oversized files get a red border
 - **Import cycle detection** (Kosaraju's strongly-connected-components algorithm); cyclic edges are drawn red
 - **Neighbour highlighting**: click a file to fade everything except what it imports and what imports it
 - **Side panel** with metrics, imports, importers, external packages and a source preview
 - **AI summaries** via Google Gemini, cached in SQLite by file-content hash so unchanged files are never re-sent
-- **Search** to highlight files by name
 - Honours `.gitignore`, skips `node_modules`, virtualenvs, build output and binaries
 
 ## Architecture
@@ -96,6 +97,9 @@ Edges point from the importer to the imported file. Imports that don't resolve t
   character and it is regenerated. API usage scales with how much code changed, not how often you click.
 - **Path-traversal guard is an allowlist.** The file and summarize endpoints only accept ids that came out
   of the scanner, so `../../etc/passwd` can never match.
+- **Two-level layout.** Each folder's files are laid out on their own (dagre for connected files, shelf-packed grid for
+  isolated ones), then the folders are laid out the same way using folder-to-folder imports. This is what keeps
+  large, loosely connected repositories readable.
 - **Selection never rebuilds the node array.** The canvas maps over React Flow's existing nodes and flips a
   `dimmed` flag, which is why dragged positions survive clicking around.
 
@@ -115,5 +119,5 @@ React 19 · Vite · @xyflow/react (React Flow 12) · @dagrejs/dagre
 
 ## Possible extensions
 
-Folder grouping on the canvas, PNG export, Go/Java/Rust parsers, per-function complexity view,
+Collapsible folders, PNG export, Go/Java/Rust parsers, per-function complexity view,
 git-blame overlay, dark mode.
