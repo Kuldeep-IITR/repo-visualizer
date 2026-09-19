@@ -31,8 +31,8 @@ export const getSuggestions = () => request("/suggestions");
 export const browseDir = (path) => request(`/browse${path ? `?path=${encodeURIComponent(path)}` : ""}`);
 export const analyzeRepo = (path, refresh = false) => request("/analyze", json({ path, refresh }));
 export const isRepoUrl = (text) => /^https?:\/\//i.test(text.trim());
-export const getFile = (path) => request(`/file?path=${encodeURIComponent(path)}`);
-export const summarizeFile = (path) => request("/summarize", json({ path }));
+export const getFile = (root, path) => request(`/file?root=${encodeURIComponent(root)}&path=${encodeURIComponent(path)}`);
+export const summarizeFile = (root, path) => request("/summarize", json({ root, path }));
 
 export const listClones = () => request("/clones");
 export const removeClone = (id) => request(`/clones?id=${encodeURIComponent(id)}`, { method: "DELETE" });

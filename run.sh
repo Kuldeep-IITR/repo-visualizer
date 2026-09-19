@@ -14,7 +14,7 @@ fi
 
 trap 'kill 0' EXIT INT TERM     # kill both children when this script exits
 
-(cd backend && .venv/bin/uvicorn app.main:app --reload --port 8000) &
+(cd backend && .venv/bin/uvicorn app.main:app --reload --reload-dir app --port 8000) &
 (cd frontend && npm run dev -- --host localhost) &
 sleep 2
 echo

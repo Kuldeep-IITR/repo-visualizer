@@ -73,7 +73,7 @@ Then open two terminals:
 ```powershell
 # terminal 1 – backend
 cd backend
-.venv\Scripts\uvicorn app.main:app --reload --port 8000
+.venv\Scripts\uvicorn app.main:app --reload --reload-dir app --port 8000
 
 # terminal 2 – frontend
 cd frontend
@@ -232,7 +232,7 @@ The backend runs one file at a time through a small pipeline:
 | `metrics.py` | Line counts and cyclomatic complexity (`radon` for Python, a decision-keyword count for other languages). |
 | `graph.py` | Assemble nodes and edges, then find import cycles with Kosaraju's strongly-connected-components algorithm. |
 | `ai.py` | Call Gemini behind a SQLite cache keyed by the SHA-256 of the file content. |
-| `state.py` | Remember the last analysis. The file and summarize endpoints only accept ids that came out of the scanner, which rules out path traversal. |
+| `state.py` | Remember recent analyses by root. The file and summarize endpoints only accept ids that came out of the scanner, which rules out path traversal. |
 
 The frontend lays the graph out in two levels (`layout.js`): inside each folder, files that import each other go
 through dagre and files with no imports are packed into a compact grid. The folders are then laid out the same
@@ -249,8 +249,8 @@ Interactive docs with a "try it" button are at **http://localhost:8000/docs** wh
 | GET | `/api/suggestions` | | `[{ label, path }]` starting points for the welcome screen |
 | GET | `/api/browse` | `?path=/abs/dir` (optional, defaults to home) | `{ path, parent, entries: [{ name, path, is_repo }] }` |
 | POST | `/api/analyze` | `{ "path": "/abs/dir" }` or `{ "path": "https://github.com/o/r", "refresh": false }` | `{ root, source_url, commit, stats, nodes[], edges[] }` |
-| GET | `/api/file` | `?path=src/main.py` | `{ path, content, truncated }` |
-| POST | `/api/summarize` | `{ "path": "src/main.py" }` | `{ summary, cached, model }` |
+| GET | `/api/file` | `?root=/abs/dir&path=src/main.py` | `{ path, content, truncated }` |
+| POST | `/api/summarize` | `{ "root": "/abs/dir", "path": "src/main.py" }` | `{ summary, cached, model }` |
 | GET | `/api/clones` | | `[{ id, url, path, commit, size_bytes, cloned_at }]` downloaded repositories |
 | DELETE | `/api/clones` | `?id=github.com/owner/repo` or `?all=true` | `{ removed[], freed_bytes }` |
 
@@ -321,6 +321,10 @@ sure it is on your `PATH`.
 **"Gemini rate limit hit".** The free tier allows a limited number of requests per minute. Wait a moment and
 press *retry*. Cached files never count against the limit.
 
+**The map disappears or "Analyse a repository first" appears after downloading a repository.** The backend was
+started with `--reload` watching the whole `backend/` folder, so new files under `backend/repos/` restarted it.
+Use `run.sh` or add `--reload-dir app` as in the Windows commands above.
+
 **Port already in use.** Something else is on 8000 or 5173. Stop it, or start the servers on other ports and set
 `VITE_API_URL` accordingly.
 
@@ -350,7 +354,7 @@ backend/
     ai.py          Gemini + SQLite cache
     browse.py      folder picker + suggestions
     remote.py      clone a repository URL into backend/repos/
-    state.py       last analysis, path allowlist
+    state.py       recent analyses, path allowlist
     models.py      Pydantic schemas (the JSON contract)
   requirements.txt
   .env.example

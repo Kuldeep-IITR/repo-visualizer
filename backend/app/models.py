@@ -18,6 +18,7 @@ class AnalyzeRequest(BaseModel):
 
 class SummarizeRequest(BaseModel):
     path: str = Field(..., description="File path relative to the analysed root", examples=["src/main.py"])
+    root: str | None = Field(None, description="The `root` from the analyze response (defaults to the latest analysis)")
 
 
 # ------------------------------------------------------------ graph pieces

@@ -80,10 +80,11 @@ def analyze(req: AnalyzeRequest):
 
 
 @app.get("/api/file", response_model=FileResponse)
-def get_file(path: str = Query(..., description="Relative path from the last analysis")):
+def get_file(path: str = Query(..., description="Relative path from an analysis"),
+             root: str | None = Query(None, description="The `root` from the analyze response")):
     """Return the text of one analysed file, for the code preview."""
     try:
-        abs_path = state.safe_file_path(path)
+        abs_path = state.safe_file_path(root, path)
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
     text = abs_path.read_text(encoding="utf-8", errors="replace")
@@ -95,7 +96,7 @@ def get_file(path: str = Query(..., description="Relative path from the last ana
 def summarize_file(req: SummarizeRequest):
     """Plain-English summary of one file. Cached by content hash, so repeat calls are free."""
     try:
-        abs_path = state.safe_file_path(req.path)
+        abs_path = state.safe_file_path(req.root, req.path)
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
     try:

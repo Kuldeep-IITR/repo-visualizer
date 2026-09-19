@@ -21,16 +21,16 @@ export default function SidePanel({ graph, node, onSelect, onClose }) {
     let cancelled = false;                 // ignore the response if the user clicked elsewhere meanwhile
     setFile(null);
     setAi({ status: "idle" });
-    getFile(node.id)
+    getFile(graph.root, node.id)
       .then((f) => { if (!cancelled) setFile(f); })
       .catch((e) => { if (!cancelled) setFile({ content: `Could not load file: ${e.message}`, truncated: false }); });
     return () => { cancelled = true; };
-  }, [node.id]);
+  }, [graph.root, node.id]);
 
   async function explain() {
     setAi({ status: "loading" });
     try {
-      const res = await summarizeFile(node.id);
+      const res = await summarizeFile(graph.root, node.id);
       setAi({ status: "done", ...res });
     } catch (e) {
       setAi({ status: "error", message: e.message });

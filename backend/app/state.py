@@ -1,40 +1,48 @@
 """
-The backend remembers the most recent analysis so /api/file and /api/summarize
-only need a relative path. One process, one user, so a module-level variable is
-enough – no database or session handling needed.
+Remembers recent analyses so /api/file and /api/summarize only need a relative
+path plus the analysed root. Several are kept (one per open browser tab, in
+practice) so two people or two tabs looking at different repositories don't
+knock each other's analysis out.
 """
+from collections import OrderedDict
 from pathlib import Path
 
 from .models import GraphResponse
 
-current: GraphResponse | None = None
-current_root: Path | None = None
-current_files: set[str] = set()
+MAX_REMEMBERED = 8
+
+# root path (str) -> set of relative file ids that came out of the scanner
+_analyses: "OrderedDict[str, set[str]]" = OrderedDict()
 
 
 def remember(graph: GraphResponse) -> None:
-    global current, current_root, current_files
-    current = graph
-    current_root = Path(graph.root)
-    current_files = {n.id for n in graph.nodes}
-
-
-def safe_file_path(rel: str) -> Path:
-    """
-    Turn a relative path from the client into an absolute one we are allowed to read.
-    Raises LookupError if nothing is analysed yet or the file is not part of it.
-    Because we only accept ids that came out of the scanner, "../../etc/passwd"
-    can never match – that is the whole security check.
-    """
-    if current_root is None:
-        raise LookupError("Analyse a repository first")
-    if rel not in current_files:
-        raise LookupError(f"Unknown file: {rel}")
-    return current_root / rel
+    root = str(Path(graph.root).resolve())
+    _analyses.pop(root, None)
+    _analyses[root] = {n.id for n in graph.nodes}
+    while len(_analyses) > MAX_REMEMBERED:
+        _analyses.popitem(last=False)          # drop the oldest
 
 
 def forget(path: Path) -> None:
-    """Called when a cached clone is deleted: drop the analysis if it was the current one."""
-    global current, current_root, current_files
-    if current_root is not None and current_root.resolve() == path.resolve():
-        current, current_root, current_files = None, None, set()
+    """Called when a cached clone is deleted."""
+    _analyses.pop(str(path.resolve()), None)
+
+
+def safe_file_path(root: str | None, rel: str) -> Path:
+    """
+    Turn (root, relative path) from the client into an absolute path we are allowed to read.
+    Raises LookupError if that root was never analysed or the file is not part of it.
+    Because we only accept ids that came out of the scanner, "../../etc/passwd"
+    can never match – that is the whole security check.
+    """
+    if not _analyses:
+        raise LookupError("Analyse a repository first")
+    if root:
+        key = str(Path(root).resolve())
+        if key not in _analyses:
+            raise LookupError("That analysis has expired. Analyse the repository again.")
+    else:
+        key = next(reversed(_analyses))        # most recent, for clients that don't send a root
+    if rel not in _analyses[key]:
+        raise LookupError(f"Unknown file: {rel}")
+    return Path(key) / rel
